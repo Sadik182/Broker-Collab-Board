@@ -20,7 +20,7 @@ export default function Navbar() {
           {/* Right - Desktop Nav */}
           <div className="hidden md:flex space-x-6 items-center">
             <Link
-              href="/dashboard"
+              href="/"
               className="text-gray-700 hover:text-blue-600 font-medium transition"
             >
               Dashboard
