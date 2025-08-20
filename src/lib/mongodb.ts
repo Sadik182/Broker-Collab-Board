@@ -1,5 +1,5 @@
 // lib/mongodb.ts
-import { MongoClient } from "mongodb";
+import { MongoClient, type Db } from "mongodb";
 
 const uri = process.env.MONGODB_URI;
 const options = {};
@@ -10,7 +10,10 @@ if (!uri) {
   );
 }
 
-let client;
+// ✅ NEW: choose your DB name from env (fallback if you want)
+const dbName = process.env.MONGODB_DB || "broker_board";
+
+let client: MongoClient;
 let clientPromise: Promise<MongoClient>;
 
 declare global {
@@ -20,16 +23,32 @@ declare global {
 }
 
 if (process.env.NODE_ENV === "development") {
-  // In development, use global to prevent hot-reload from creating multiple connections
   if (!global._mongoClientPromise) {
     client = new MongoClient(uri, options);
     global._mongoClientPromise = client.connect();
   }
-  clientPromise = global._mongoClientPromise;
+  clientPromise = global._mongoClientPromise!;
 } else {
-  // In production, always create a new connection
   client = new MongoClient(uri, options);
   clientPromise = client.connect();
 }
 
+// ✅ NEW: cache Db instance so we don’t call client.db() everywhere
+let _db: Db | null = null;
+
+/** Get a Db instance (reuse connection from your existing clientPromise) */
+export async function getDb(): Promise<Db> {
+  if (_db) return _db;
+  const client = await clientPromise;
+  _db = client.db(dbName);
+  return _db;
+}
+
+/** Ensure indexes for users collection (call once, e.g. in register route) */
+export async function ensureUserIndexes() {
+  const db = await getDb();
+  await db.collection("users").createIndex({ email: 1 }, { unique: true });
+}
+
+// keep your original default export for compatibility
 export default clientPromise;
